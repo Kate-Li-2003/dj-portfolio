@@ -1,0 +1,39 @@
+{
+  "chart": {
+    "title": "Refugees by country of asylum",
+    "subtitle": "[People](#dod:refugee) who fled their country of origin because of serious threats against which the authorities of their home country cannot or will not protect them. This includes all refugees, not just those who arrived that year.",
+    "note": "",
+    "citation": "UNHCR (2025)",
+    "originalChartUrl": "https://ourworldindata.org/grapher/refugee-population-by-country-or-territory-of-asylum?v=1&csvType=full&useColumnShortNames=false",
+    "selection": [
+      "United Kingdom",
+      "Chad",
+      "India",
+      "Sudan"
+    ]
+  },
+  "columns": {
+    "Refugees by country of asylum": {
+      "titleShort": "Refugees by country of asylum",
+      "titleLong": "Refugees by country of asylum",
+      "descriptionShort": "[People](#dod:refugee) who fled their country of origin because of serious threats against which the authorities of their home country cannot or will not protect them. This includes all refugees who live in this country, not just those who arrived that year.",
+      "descriptionKey": [
+        "A refugee is a person in need of international protection, who had to flee their home country because of serious threats against which the authorities of their home country cannot or will not protect them."
+      ],
+      "descriptionProcessing": "- The United Nations High Commissioner for Refugees (UNHCR) collects data on refugee populations for each country of origin and country of asylum separately. To calculate the total number of refugees living in a country, we sum up the data from all origin countries. To calculate the total number of refugees from a country, we sum up the data from all asylum countries.\n- To calculate the number of refugees per 1,000 or 100,000 people in a country, we divide the number of refugees by the total population of the country (for the same year) and multiply by the factor. The population estimates come from a long-run dataset [maintained by Our World in Data](https://ourworldindata.org/population-sources).\n- We remove refugee populations where the country of origin and country of asylum are the same, as refugees are defined as people who have fled their country and crossed an international border. We also remove asylum seekers where the country of origin and country of asylum are the same.\n- We remove data for China after 2020 due to a large data discontinuity.",
+      "shortUnit": "",
+      "unit": "people",
+      "timespan": "1951-2024",
+      "type": "Integer",
+      "owidVariableId": 1104633,
+      "shortName": "refugees",
+      "lastUpdated": "2025-07-03",
+      "nextUpdate": "2026-07-03",
+      "citationShort": "UNHCR (2025) – with major processing by Our World in Data",
+      "citationLong": "UNHCR (2025) – with major processing by Our World in Data. “Refugees by country of asylum” [dataset]. UNHCR, “Refugee Population Statistics Database Annual statistics for 2024” [original data].",
+      "fullMetadata": "https://api.ourworldindata.org/v1/indicators/1104633.metadata.json"
+    }
+  },
+  "dateDownloaded": "2026-01-12",
+  "activeFilters": {}
+}

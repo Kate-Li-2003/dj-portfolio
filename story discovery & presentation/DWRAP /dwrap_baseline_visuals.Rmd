@@ -1,0 +1,498 @@
+---
+title: "Global Refugee Flows: Baseline Visuals"
+subtitle: "Who Hosts the World's Refugees? (1951–2022)"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+    code_folding: hide
+    self_contained: true
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+# ── Install any missing packages ──────────────────────────────────────────────
+pkgs <- c(
+  "refugees",          # UNHCR official data package (CRAN)
+  "plotly",            # interactive Sankey + trend charts
+  "leaflet",           # interactive map
+  "dplyr", "tidyr",   # data wrangling
+  "countrycode",       # ISO codes → UN regions
+  "wbstats",           # World Bank income classifications
+  "rnaturalearth",     # country polygons + centroids
+  "rnaturalearthdata", # data dependency for rnaturalearth
+  "sf",                # spatial features
+  "geosphere",         # great-circle arc paths for flow lines
+  "scales",            # rescale() for line widths
+  "htmltools"          # HTML() for leaflet labels
+)
+new_pkgs <- pkgs[!pkgs %in% installed.packages()[, "Package"]]
+if (length(new_pkgs)) {
+  message("Installing: ", paste(new_pkgs, collapse = ", "))
+  install.packages(new_pkgs, repos = "https://cloud.r-project.org", quiet = TRUE)
+}
+
+library(refugees)
+library(plotly)
+library(leaflet)
+library(dplyr)
+library(tidyr)
+library(countrycode)
+library(wbstats)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
+library(geosphere)
+library(scales)
+library(htmltools)
+```
+
+---
+
+## Overview
+
+These three baseline visuals set the stage for the DWRAP portfolio piece.
+The central argument: **the vast majority of the world's displaced population
+is hosted not by wealthy nations, but by developing countries** — many of which
+also have comparatively liberal asylum policies on paper (as measured by DWRAP).
+
+**Data sources:**
+
+- **UNHCR refugee & asylum-seeker data** via the [`refugees`](https://populationstatistics.github.io/refugees/) R package (UNHCR's official package; same underlying data as the UNHCR Refugee Data Finder)
+- **World Bank income classifications** via the [`wbstats`](https://CRAN.R-project.org/package=wbstats) package
+- **Country polygons and centroids** via the [`rnaturalearth`](https://docs.ropensci.org/rnaturalearth/) package
+
+---
+
+## Data Preparation
+
+```{r data-prep, message=FALSE, warning=FALSE}
+# ── 1. UNHCR bilateral refugee data ──────────────────────────────────────────
+# `refugees::population` contains country-of-origin × country-of-asylum flows
+# for every year from 1951 to the most recent release.
+pop <- refugees::population
+
+flows <- pop %>%
+  filter(
+    !is.na(coo_iso), !is.na(coa_iso),
+    coo_iso != "UNK", coa_iso != "UNK",   # drop "unknown country" records
+    coo_iso != coa_iso                      # exclude same-country flows
+  ) %>%
+  mutate(
+    # combine refugees + asylum-seekers as "total displaced in host country"
+    total_displaced = coalesce(refugees, 0L) + coalesce(asylum_seekers, 0L)
+  ) %>%
+  filter(total_displaced > 0)
+
+# ── 2. World Bank income groups ───────────────────────────────────────────────
+wb_ctry <- wb_countries() %>%
+  select(iso3c, income_level, region) %>%
+  rename(iso3 = iso3c) %>%
+  mutate(
+    dev_status = case_when(
+      income_level == "High income"                   ~ "Developed",
+      income_level %in% c("Upper middle income",
+                          "Lower middle income",
+                          "Low income")               ~ "Developing",
+      TRUE                                            ~ NA_character_
+    )
+  )
+
+# ── 3. UN sub-regions via countrycode ────────────────────────────────────────
+region_lkp <- codelist %>%
+  select(iso3c, un.regionsub.name) %>%
+  rename(iso3 = iso3c, un_subregion = un.regionsub.name) %>%
+  filter(!is.na(iso3))
+
+# ── 4. Country centroids (for flow-line anchors) ──────────────────────────────
+world_sf  <- ne_countries(scale = "medium", returnclass = "sf")
+centroids <- cbind(
+  world_sf %>% st_drop_geometry() %>% select(iso_a3, name_long),
+  world_sf %>% st_centroid() %>% st_coordinates()
+) %>%
+  as_tibble() %>%
+  rename(iso3 = iso_a3, lng = X, lat = Y) %>%
+  filter(iso3 != "-99")
+
+# ── 5. Enrich bilateral flows ─────────────────────────────────────────────────
+flows_enriched <- flows %>%
+  # income group for origin
+  left_join(wb_ctry %>% select(iso3, dev_status_coo = dev_status,
+                                income_coo = income_level),
+            by = c("coo_iso" = "iso3")) %>%
+  # income group for asylum country
+  left_join(wb_ctry %>% select(iso3, dev_status_coa = dev_status,
+                                income_coa = income_level),
+            by = c("coa_iso" = "iso3")) %>%
+  # UN sub-region for origin
+  left_join(region_lkp, by = c("coo_iso" = "iso3")) %>%
+  mutate(
+    # Simplified origin-region label for Sankey readability
+    origin_region = case_when(
+      un_subregion %in% c("Eastern Africa", "Western Africa",
+                          "Middle Africa", "Southern Africa",
+                          "Northern Africa")                     ~ "Africa",
+      un_subregion %in% c("Western Asia", "Southern Asia",
+                          "Central Asia")                        ~ "Middle East & S. Asia",
+      un_subregion %in% c("Eastern Asia", "South-eastern Asia") ~ "East & SE Asia",
+      un_subregion %in% c("Eastern Europe", "Southern Europe",
+                          "Western Europe", "Northern Europe")   ~ "Europe",
+      un_subregion %in% c("Central America", "South America",
+                          "Caribbean")                           ~ "Latin America & Caribbean",
+      un_subregion == "Northern America"                         ~ "Northern America",
+      TRUE                                                        ~ "Other / Unknown"
+    )
+  )
+
+cat(sprintf(
+  "Records: %s  |  Years: %d–%d  |  Country pairs: %s\n",
+  format(nrow(flows_enriched), big.mark = ","),
+  min(flows_enriched$year),
+  max(flows_enriched$year),
+  format(n_distinct(paste(flows_enriched$coo_iso, flows_enriched$coa_iso)), big.mark = ",")
+))
+```
+
+---
+
+## Visual 1 — Sankey: Where Do Refugees End Up? {.tabset}
+
+Each ribbon represents the total number of refugees + asylum-seekers flowing
+from an **origin region** (left) to a **destination income group** (right) in a
+given year. Ribbon width ∝ number of people. The overwhelming flow toward
+*Developing* countries is the story.
+
+> **Tip:** Change `selected_year` in the first chunk to any year in the dataset.
+
+### Most Recent Year (2022)
+
+```{r sankey-2022, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+build_sankey <- function(yr, title_suffix = "") {
+  d <- flows_enriched %>%
+    filter(year == yr, !is.na(origin_region), !is.na(dev_status_coa)) %>%
+    group_by(origin_region, dev_status_coa) %>%
+    summarise(total = sum(total_displaced, na.rm = TRUE), .groups = "drop") %>%
+    filter(total > 0)
+
+  if (nrow(d) == 0) return(plotly_empty() %>% layout(title = paste("No data for", yr)))
+
+  # Fixed node order so colors are stable across tabs
+  origin_order <- c("Africa", "Middle East & S. Asia", "East & SE Asia",
+                    "Europe", "Latin America & Caribbean", "Northern America",
+                    "Other / Unknown")
+  dest_order   <- c("Developing", "Developed")
+
+  origins_present <- intersect(origin_order, unique(d$origin_region))
+  dests_present   <- intersect(dest_order,   unique(d$dev_status_coa))
+  all_nodes       <- c(origins_present, dests_present)
+
+  origin_colors <- c("#C0392B", "#E67E22", "#27AE60",
+                     "#2980B9", "#8E44AD", "#16A085", "#7F8C8D")
+  dest_colors   <- c("#2C3E50", "#BDC3C7")  # dark = developing, light = developed
+
+  node_colors <- c(
+    origin_colors[seq_along(origins_present)],
+    dest_colors[seq_along(dests_present)]
+  )
+
+  link_df <- d %>%
+    filter(origin_region %in% origins_present, dev_status_coa %in% dests_present) %>%
+    mutate(
+      source = match(origin_region,  all_nodes) - 1L,
+      target = match(dev_status_coa, all_nodes) - 1L
+    )
+
+  plot_ly(
+    type = "sankey", orientation = "h", arrangement = "snap",
+    node = list(
+      label     = all_nodes,
+      color     = node_colors,
+      pad       = 18, thickness = 22,
+      line      = list(color = "white", width = 0.5)
+    ),
+    link = list(
+      source = link_df$source,
+      target = link_df$target,
+      value  = link_df$total,
+      color  = "rgba(180,180,180,0.30)",
+      label  = paste0(
+        link_df$origin_region, " → ", link_df$dev_status_coa, "<br>",
+        format(link_df$total, big.mark = ","), " displaced persons"
+      )
+    )
+  ) %>%
+    layout(
+      title = list(
+        text = paste0(
+          "<b>Refugee & Asylum-Seeker Flows by Origin Region → Destination (", yr, ")</b>",
+          title_suffix,
+          "<br><sup>Ribbon width = total displaced persons | Source: UNHCR via `refugees` R pkg</sup>"
+        ),
+        font = list(size = 13)
+      ),
+      font = list(size = 12),
+      paper_bgcolor = "#FAFAFA"
+    )
+}
+
+build_sankey(2022)
+```
+
+### 2010
+
+```{r sankey-2010, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+build_sankey(2010)
+```
+
+### 2000
+
+```{r sankey-2000, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+build_sankey(2000)
+```
+
+### 1990
+
+```{r sankey-1990, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+build_sankey(1990)
+```
+
+### 1980
+
+```{r sankey-1980, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+build_sankey(1980)
+```
+
+---
+
+## Visual 2 — Interactive World Map: Global Hosting Burden
+
+Countries are shaded by **total refugees + asylum-seekers hosted** (log scale,
+to handle the extreme right-skew). Curved lines show the **top 40 bilateral
+flows** for the selected year — line width ∝ magnitude. Hover over any country
+or flow line for details.
+
+> Change `map_year` below to explore different years.
+
+```{r map, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+map_year <- 2022   # ← change this to any year in the dataset
+
+# ── Totals per host country ───────────────────────────────────────────────────
+hosted <- flows_enriched %>%
+  filter(year == map_year) %>%
+  group_by(coa_iso, coa_name) %>%
+  summarise(refugees_hosted = sum(total_displaced, na.rm = TRUE), .groups = "drop")
+
+# ── Totals per origin country ─────────────────────────────────────────────────
+originated <- flows_enriched %>%
+  filter(year == map_year) %>%
+  group_by(coo_iso, coo_name) %>%
+  summarise(refugees_from = sum(total_displaced, na.rm = TRUE), .groups = "drop")
+
+# ── Merge onto world shapefile ────────────────────────────────────────────────
+world_map <- world_sf %>%
+  left_join(hosted,     by = c("iso_a3" = "coa_iso")) %>%
+  left_join(originated, by = c("iso_a3" = "coo_iso")) %>%
+  left_join(wb_ctry %>% select(iso3, income_level),
+            by = c("iso_a3" = "iso3")) %>%
+  mutate(
+    refugees_hosted = replace_na(refugees_hosted, 0),
+    refugees_from   = replace_na(refugees_from,   0),
+    popup_text = paste0(
+      "<strong>", name_long, "</strong><br>",
+      "<em>", replace_na(income_level, "Income group unknown"), "</em><br>",
+      "Refugees/AS hosted: <b>", format(refugees_hosted, big.mark = ","), "</b><br>",
+      "Refugees/AS originating: <b>", format(refugees_from, big.mark = ","), "</b>"
+    )
+  )
+
+# ── Color scale (log1p so zeros render; labels back-transform) ────────────────
+pal <- colorNumeric(
+  palette  = c("#FFF7EC", "#FEE8C8", "#FDD49E", "#FDBB84",
+               "#FC8D59", "#EF6548", "#D7301F", "#990000"),
+  domain   = log1p(world_map$refugees_hosted),
+  na.color = "#D0D0D0"
+)
+
+legend_breaks <- c(0, 1e3, 1e4, 1e5, 5e5, 1e6, 2e6)
+legend_labels <- c("0", "1K", "10K", "100K", "500K", "1M", "2M+")
+
+# ── Top 40 bilateral flows ────────────────────────────────────────────────────
+top_flows <- flows_enriched %>%
+  filter(year == map_year) %>%
+  slice_max(total_displaced, n = 40, with_ties = FALSE) %>%
+  left_join(centroids %>% select(iso3, lng_coo = lng, lat_coo = lat),
+            by = c("coo_iso" = "iso3")) %>%
+  left_join(centroids %>% select(iso3, lng_coa = lng, lat_coa = lat),
+            by = c("coa_iso" = "iso3")) %>%
+  filter(!is.na(lng_coo), !is.na(lat_coo), !is.na(lng_coa), !is.na(lat_coa))
+
+max_flow <- max(top_flows$total_displaced, na.rm = TRUE)
+
+# ── Build leaflet map ─────────────────────────────────────────────────────────
+m <- leaflet(world_map,
+             options = leafletOptions(minZoom = 2, worldCopyJump = FALSE)) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  setView(lng = 20, lat = 15, zoom = 2) %>%
+  addPolygons(
+    fillColor   = ~pal(log1p(refugees_hosted)),
+    weight      = 0.4, color = "white", opacity = 1,
+    fillOpacity = 0.85,
+    label       = ~lapply(popup_text, HTML),
+    labelOptions = labelOptions(style = list("font-size" = "12px")),
+    highlightOptions = highlightOptions(
+      weight = 2, color = "#444", fillOpacity = 0.95, bringToFront = TRUE
+    )
+  ) %>%
+  addLegend(
+    position  = "bottomright",
+    colors    = pal(log1p(legend_breaks)),
+    labels    = legend_labels,
+    title     = paste0("Refugees + AS Hosted<br>(", map_year, ")"),
+    opacity   = 0.85
+  )
+
+# ── Overlay great-circle flow lines ──────────────────────────────────────────
+for (i in seq_len(nrow(top_flows))) {
+  row <- top_flows[i, ]
+  lwd <- rescale(row$total_displaced, to = c(0.8, 5), from = c(0, max_flow))
+
+  gc_path <- tryCatch(
+    gcIntermediate(
+      c(row$lng_coo, row$lat_coo),
+      c(row$lng_coa, row$lat_coa),
+      n = 60, addStartEnd = TRUE, breakAtDateLine = TRUE
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(gc_path)) next
+
+  flow_label <- HTML(paste0(
+    "<strong>", row$coo_name, " → ", row$coa_name, "</strong><br>",
+    format(row$total_displaced, big.mark = ","), " displaced persons"
+  ))
+
+  draw_segment <- function(seg) {
+    m <<- m %>%
+      addPolylines(
+        lng = seg[, 1], lat = seg[, 2],
+        weight = lwd, color = "#1A5276", opacity = 0.55,
+        label = flow_label,
+        labelOptions = labelOptions(style = list("font-size" = "11px"))
+      )
+  }
+
+  if (is.list(gc_path)) {
+    lapply(gc_path, draw_segment)
+  } else {
+    draw_segment(gc_path)
+  }
+}
+
+m %>%
+  addControl(
+    html = HTML(paste0(
+      "<div style='background:white;padding:6px 10px;border-radius:4px;",
+      "font-size:11px;box-shadow:0 1px 4px rgba(0,0,0,.2);'>",
+      "<strong>Top 40 bilateral flows (", map_year, ")</strong><br>",
+      "Line width ∝ magnitude | Hover for details",
+      "</div>"
+    )),
+    position = "topright"
+  )
+```
+
+---
+
+## Visual 3 — Trend: Share of Refugees in Developing Countries, 1951–2022
+
+The simplest framing of the core argument: what **share** of all refugees
+globally is hosted in developing (non-high-income) countries, year by year?
+
+```{r trend, message=FALSE, warning=FALSE, fig.width=10, fig.height=5}
+trend <- flows_enriched %>%
+  filter(!is.na(dev_status_coa)) %>%
+  group_by(year, dev_status_coa) %>%
+  summarise(total = sum(total_displaced, na.rm = TRUE), .groups = "drop") %>%
+  group_by(year) %>%
+  mutate(
+    grand_total = sum(total),
+    share       = total / grand_total
+  ) %>%
+  ungroup()
+
+dev_share <- trend %>% filter(dev_status_coa == "Developing")
+
+# Global totals (both categories) for the secondary axis context
+totals_by_year <- trend %>%
+  group_by(year) %>%
+  summarise(grand_total = sum(total), .groups = "drop")
+
+plot_ly() %>%
+  # Area fill under the share line
+  add_trace(
+    data = dev_share,
+    x = ~year, y = ~share,
+    type = "scatter", mode = "none",
+    fill = "tozeroy", fillcolor = "rgba(192,57,43,0.12)",
+    showlegend = FALSE, hoverinfo = "none"
+  ) %>%
+  # Share line (primary y-axis)
+  add_trace(
+    data = dev_share,
+    x = ~year, y = ~share,
+    type = "scatter", mode = "lines+markers",
+    name = "Share in developing countries",
+    line   = list(color = "#C0392B", width = 2.5),
+    marker = list(color = "#C0392B", size = 4),
+    hovertemplate = paste0(
+      "<b>%{x}</b><br>",
+      "Share in developing countries: <b>%{y:.1%}</b>",
+      "<extra></extra>"
+    )
+  ) %>%
+  # 50% reference line annotation
+  add_segments(
+    x = ~min(dev_share$year), xend = ~max(dev_share$year),
+    y = 0.5, yend = 0.5,
+    line = list(color = "gray", dash = "dot", width = 1),
+    showlegend = FALSE, hoverinfo = "none"
+  ) %>%
+  layout(
+    title = list(
+      text = paste0(
+        "<b>Share of World's Refugees Hosted by Developing Countries</b><br>",
+        "<sup>1951–2022 | Refugees + asylum-seekers | Source: UNHCR via `refugees` R package</sup>"
+      ),
+      font = list(size = 13)
+    ),
+    xaxis = list(
+      title = "Year", dtick = 10,
+      showgrid = TRUE, gridcolor = "#EEEEEE"
+    ),
+    yaxis = list(
+      title = "Share of global displaced population",
+      tickformat = ".0%", range = c(0, 1),
+      showgrid = TRUE, gridcolor = "#EEEEEE"
+    ),
+    annotations = list(list(
+      x = min(dev_share$year) + 2, y = 0.52,
+      text = "50% threshold", showarrow = FALSE,
+      font = list(color = "gray", size = 10)
+    )),
+    paper_bgcolor = "#FAFAFA",
+    plot_bgcolor  = "#FAFAFA",
+    legend = list(x = 0.02, y = 0.15)
+  )
+```
+
+---
+
+*Next step: merge these baseline visuals with the DWRAP policy index data
+(`dwrap_1951_2022.dta`) to show that developing countries with high hosting
+burdens often also score higher on de jure policy liberality.*
+
+*Data: UNHCR Population Statistics via the `refugees` R package (CRAN).
+Income classifications: World Bank Development Indicators. This document is
+part of a larger portfolio piece on the
+[DWRAP dataset](https://datacatalog.worldbank.org/search/dataset/0064424).*

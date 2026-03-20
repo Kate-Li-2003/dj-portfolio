@@ -1,0 +1,397 @@
+/* ============================================================
+   DJ Portfolio — shared stylesheet
+   ============================================================ */
+
+/* --- Custom properties ------------------------------------ */
+:root {
+  --color-bg:      #FAFAFA;
+  --color-text:    #1A1A1A;
+  --color-accent:  #2166AC;
+  --color-muted:   #666666;
+  --color-border:  #DDDDDD;
+
+  --font-heading: "Georgia", serif;
+  --font-body:    "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --max-width: 860px;
+  --nav-height: 56px;
+}
+
+/* --- Reset / base ----------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  line-height: 1.65;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  font-weight: normal;
+  line-height: 1.25;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* --- Layout wrappers -------------------------------------- */
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+main {
+  flex: 1;
+  padding-top: 3rem;
+  padding-bottom: 4rem;
+}
+
+/* --- Navigation ------------------------------------------- */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  height: var(--nav-height);
+  display: flex;
+  align-items: center;
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: var(--max-width);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.nav-brand {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  color: var(--color-text);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.nav-brand:hover {
+  text-decoration: none;
+  color: var(--color-accent);
+}
+
+.nav-links {
+  display: flex;
+  gap: 2rem;
+  list-style: none;
+  align-items: center;
+}
+
+.nav-links a {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding-bottom: 3px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.nav-links a:hover {
+  color: var(--color-accent);
+  text-decoration: none;
+  border-bottom-color: var(--color-accent);
+}
+
+.nav-links a.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+/* --- Footer ----------------------------------------------- */
+footer {
+  border-top: 1px solid var(--color-border);
+  padding: 1.5rem 0;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+footer .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* --- Page header ------------------------------------------ */
+.page-header {
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.page-header .subtitle {
+  color: var(--color-muted);
+  font-size: 1rem;
+}
+
+/* --- Home hero -------------------------------------------- */
+.hero {
+  padding: 4rem 0 3rem;
+}
+
+.hero-name {
+  font-size: 2.75rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+
+.hero-tagline {
+  font-size: 1.1rem;
+  color: var(--color-muted);
+  max-width: 600px;
+  line-height: 1.6;
+}
+
+/* --- Section cards / tiles -------------------------------- */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-top: 3rem;
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  padding: 1.75rem 1.5rem;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  background-color: #fff;
+}
+
+.card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.card-title {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  color: var(--color-accent);
+  margin-bottom: 0.6rem;
+}
+
+.card-desc {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+/* card as anchor */
+a.card {
+  display: block;
+  color: inherit;
+}
+
+a.card:hover {
+  text-decoration: none;
+}
+
+a.card:hover .card-title {
+  text-decoration: underline;
+}
+
+/* --- Story listing cards ---------------------------------- */
+.story-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.story-card {
+  border: 1px solid var(--color-border);
+  padding: 1.5rem;
+  background-color: #fff;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.story-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.story-card-title {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  color: var(--color-accent);
+  margin-bottom: 0.5rem;
+}
+
+.story-card-desc {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  line-height: 1.6;
+  margin-bottom: 0.9rem;
+}
+
+.story-card-link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  letter-spacing: 0.01em;
+}
+
+.story-card-link:hover {
+  text-decoration: underline;
+}
+
+/* --- DWRAP story page ------------------------------------- */
+.story-meta {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-top: 0.5rem;
+  line-height: 1.6;
+}
+
+.story-meta a {
+  color: var(--color-muted);
+  text-decoration: underline;
+}
+
+.story-body {
+  max-width: 680px;
+}
+
+.story-body p {
+  margin-bottom: 1.25rem;
+  font-size: 0.975rem;
+  line-height: 1.75;
+}
+
+.story-body h2 {
+  font-size: 1.3rem;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text);
+}
+
+/* --- Visualization placeholders --------------------------- */
+.viz-placeholder {
+  background-color: #F5F5F5;
+  border: 1px solid #DDDDDD;
+  padding: 2rem;
+  margin: 1.5rem 0 1rem;
+  font-style: italic;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.viz-placeholder .viz-label {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-style: normal;
+  color: var(--color-text);
+  margin-bottom: 0.4rem;
+}
+
+/* --- Intro / section paragraph ---------------------------- */
+.section-intro {
+  font-size: 0.975rem;
+  color: var(--color-muted);
+  max-width: 620px;
+  line-height: 1.7;
+  margin-bottom: 0.5rem;
+}
+
+/* --- Coming soon ------------------------------------------ */
+.coming-soon {
+  color: var(--color-muted);
+  font-size: 1rem;
+  margin-top: 1rem;
+}
+
+/* --- Responsive ------------------------------------------- */
+@media (max-width: 700px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  nav {
+    height: auto;
+    padding: 0.75rem 0;
+  }
+
+  .nav-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .nav-links {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .hero-name {
+    font-size: 2rem;
+  }
+
+  .hero {
+    padding: 2.5rem 0 2rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.6rem;
+  }
+
+  main {
+    padding-top: 2rem;
+  }
+}

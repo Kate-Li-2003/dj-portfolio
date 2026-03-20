@@ -1,0 +1,492 @@
+---
+title: "DWRAP — Policy Liberality Trends: Global North vs. Global South"
+subtitle: "Step 2 of the Narrative: The Global South Is Liberalizing"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+    code_folding: hide
+    self_contained: true
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+pkgs <- c("haven", "dplyr", "tidyr", "ggplot2", "plotly",
+          "countrycode", "wbstats", "scales", "ggrepel", "forcats")
+new_pkgs <- pkgs[!pkgs %in% installed.packages()[, "Package"]]
+if (length(new_pkgs)) install.packages(new_pkgs, repos = "https://cloud.r-project.org", quiet = TRUE)
+
+library(haven)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(plotly)
+library(countrycode)
+library(wbstats)
+library(scales)
+library(ggrepel)
+```
+
+---
+
+## Overview
+
+This document produces **Visual 4** of the DWRAP portfolio narrative:
+
+> *As the world's refugee burden has shifted toward developing countries,
+> those same countries have — on paper — been **liberalizing** their asylum
+> and refugee policies at a faster rate than wealthy nations.*
+
+The chart shows individual country policy trajectories as light background
+traces, with two bold trend lines distinguishing the **Global North** from
+the **Global South**.
+
+---
+
+## A Note on "Global North" vs. "Global South"
+
+This is a contested classification. Three operationalizations are common:
+
+| Method | Definition of "Global North" | Pros | Cons |
+|--------|------------------------------|------|------|
+| **World Bank income group** (used here as primary) | High-income countries | Objective, data-driven, annually updated | Conflates economic status with geopolitical category |
+| **OECD membership** | 38 current OECD members | Politically meaningful "developed world" proxy | Includes Turkey, Mexico, Chile; excludes Singapore, Saudi Arabia |
+| **UN development status / HDI** | Very High / High HDI | Reflects human development broadly | Changes over time, less binary |
+
+**This file implements both the World Bank and OECD methods** and plots them
+side by side so you can choose which framing best fits the narrative.
+
+---
+
+## 1. Data Loading & Exploration
+
+```{r load-data, message=FALSE, warning=FALSE}
+# Path is relative to this Rmd's location (DWRAP/ subfolder)
+dwrap_path <- "../dwrap_1951_2022.dta"
+
+if (!file.exists(dwrap_path)) {
+  stop(paste(
+    "Data file not found at:", dwrap_path,
+    "\nUpdate the path to point to dwrap_1951_2022.dta"
+  ))
+}
+
+dwrap_raw <- read_dta(dwrap_path)
+
+# ── Explore structure ─────────────────────────────────────────────────────────
+cat("Dimensions:", nrow(dwrap_raw), "rows ×", ncol(dwrap_raw), "columns\n\n")
+cat("All column names:\n")
+print(names(dwrap_raw))
+
+cat("\nYear range:", min(dwrap_raw$year, na.rm = TRUE),
+    "–", max(dwrap_raw$year, na.rm = TRUE), "\n")
+cat("Unique countries:", n_distinct(dwrap_raw$country), "\n")
+```
+
+```{r identify-index-column, message=FALSE, warning=FALSE}
+# ── Identify the overall policy index column ──────────────────────────────────
+# Based on the DWRAP tech guide, the overall policy score:
+#   - ranges from 0 to ~0.674 (mean ≈ 0.167)
+#   - is numeric / double
+#
+# Run this chunk to see candidate columns — then set `policy_col` below.
+
+numeric_cols <- dwrap_raw %>%
+  select(where(is.numeric)) %>%
+  select(-year) %>%
+  summarise(across(everything(), list(
+    min  = ~min(., na.rm = TRUE),
+    max  = ~max(., na.rm = TRUE),
+    mean = ~mean(., na.rm = TRUE)
+  ))) %>%
+  pivot_longer(everything(),
+               names_to = c("variable", ".value"),
+               names_pattern = "(.+)_(min|max|mean)") %>%
+  filter(min >= 0, max <= 1, mean > 0.05, mean < 0.5) %>%
+  arrange(desc(mean))
+
+cat("Candidate policy index columns (0–1 range, plausible mean):\n")
+print(numeric_cols)
+
+# ── SET THIS after reviewing the output above ─────────────────────────────────
+#
+# Common names seen in DWRAP releases: "index", "policy_index", "i_policy",
+# "lib_index", "overall_index". Set the correct name below.
+#
+policy_col  <- "index"       # ← UPDATE if column name differs
+access_col  <- "access"      # ← field-level index (Access)
+services_col <- "services"   # ← field-level index (Services)
+# (remaining fields: livelihoods, movement, participation)
+```
+
+---
+
+## 2. North / South Classification
+
+```{r classify, message=FALSE, warning=FALSE}
+# ── World Bank income groups ──────────────────────────────────────────────────
+wb_ctry <- wb_countries() %>%
+  select(iso3c, country = country, income_level) %>%
+  mutate(
+    north_wb = income_level == "High income",
+    ns_wb    = if_else(north_wb, "Global North\n(High Income)", "Global South\n(Non-High Income)")
+  )
+
+# ── OECD membership (current 38 members as of 2024) ──────────────────────────
+oecd_iso3 <- c(
+  "AUS","AUT","BEL","CAN","CHL","COL","CRI","CZE","DNK","EST",
+  "FIN","FRA","DEU","GRC","HUN","ISL","IRL","ISR","ITA","JPN",
+  "KOR","LVA","LTU","LUX","MEX","NLD","NZL","NOR","POL","PRT",
+  "SVK","SVN","ESP","SWE","CHE","TUR","GBR","USA"
+)
+
+oecd_df <- tibble(
+  iso3c   = oecd_iso3,
+  north_oecd = TRUE,
+  ns_oecd    = "Global North\n(OECD)"
+)
+
+# ── Add ISO3 codes to DWRAP using countrycode ─────────────────────────────────
+# DWRAP uses country names; we convert to ISO3 for joining.
+dwrap <- dwrap_raw %>%
+  mutate(
+    iso3 = countrycode(country, origin = "country.name", destination = "iso3c",
+                       warn = FALSE)
+  )
+
+# Warn about any countries that didn't match
+unmatched <- dwrap %>%
+  filter(is.na(iso3)) %>%
+  distinct(country)
+if (nrow(unmatched) > 0) {
+  message("Countries without ISO3 match (", nrow(unmatched), "):")
+  print(unmatched$country)
+}
+
+# ── Merge classifications ─────────────────────────────────────────────────────
+dwrap <- dwrap %>%
+  left_join(wb_ctry %>% select(iso3c, north_wb, ns_wb),
+            by = c("iso3" = "iso3c")) %>%
+  left_join(oecd_df,
+            by = c("iso3" = "iso3c")) %>%
+  mutate(
+    north_oecd = replace_na(north_oecd, FALSE),
+    ns_oecd    = if_else(north_oecd, "Global North\n(OECD)", "Global South\n(Non-OECD)")
+  )
+
+cat("World Bank classification:\n")
+print(table(dwrap$ns_wb, useNA = "always"))
+cat("\nOECD classification:\n")
+print(table(dwrap$ns_oecd, useNA = "always"))
+```
+
+---
+
+## 3. Aggregate to Country-Year Means
+
+```{r aggregate, message=FALSE, warning=FALSE}
+# If the data has one row per law (multiple rows per country-year),
+# collapse to country-year by taking the most recent law's score.
+# If already country-year panel, this is a no-op.
+
+# Check: rows per country-year
+rows_per_cy <- dwrap %>%
+  count(country, year) %>%
+  summarise(max_rows = max(n), mean_rows = mean(n))
+cat("Max rows per country-year:", rows_per_cy$max_rows, "\n")
+cat("Mean rows per country-year:", round(rows_per_cy$mean_rows, 2), "\n")
+
+# Collapse to country-year (take max index = most liberal law if multiple)
+# Adjust `policy_col` at the top if the column name differs.
+cy_panel <- dwrap %>%
+  rename(policy_index = all_of(policy_col)) %>%
+  group_by(country, iso3, year, ns_wb, ns_oecd, north_wb, north_oecd) %>%
+  summarise(
+    policy_index = max(policy_index, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  filter(!is.infinite(policy_index), !is.na(policy_index))
+
+cat("\nCountry-year panel:", nrow(cy_panel), "rows\n")
+cat("Countries:", n_distinct(cy_panel$country), "\n")
+```
+
+---
+
+## 4. Visual 4 — Policy Liberality Trends: North vs. South
+
+### Version A — World Bank Income Classification
+
+```{r plot-wb, message=FALSE, warning=FALSE, fig.width=11, fig.height=7}
+# ── Group averages ────────────────────────────────────────────────────────────
+avg_wb <- cy_panel %>%
+  filter(!is.na(ns_wb)) %>%
+  group_by(year, ns_wb) %>%
+  summarise(mean_index = mean(policy_index, na.rm = TRUE),
+            n = n(), .groups = "drop")
+
+# ── Palette ───────────────────────────────────────────────────────────────────
+palette_wb <- c(
+  "Global North\n(High Income)"     = "#2166AC",   # blue
+  "Global South\n(Non-High Income)" = "#D6604D"    # red-orange
+)
+
+# ── Placeholder annotations: add your key events here ───────────────────────
+# Format: list(year, label, y_nudge)
+# y_nudge shifts label up/down from the group mean to avoid overlap.
+events <- tribble(
+  ~year, ~label,                          ~y_pos,
+  1951,  "1951 Refugee\nConvention",       0.62,
+  1967,  "1967\nProtocol",                 0.62,
+  1969,  "OAU\nConvention",                0.55,
+  1984,  "Cartagena\nDeclaration",         0.55,
+  2018,  "Global Compact\non Refugees",    0.62
+  # ↑ Add or edit events here — x = year, y_pos = height on 0–1 scale
+)
+
+# ── ggplot base ───────────────────────────────────────────────────────────────
+p_wb <- ggplot() +
+  # Individual country traces (light gray background)
+  geom_line(
+    data = cy_panel %>% filter(!is.na(ns_wb)),
+    aes(x = year, y = policy_index, group = country),
+    color = "#CCCCCC", linewidth = 0.25, alpha = 0.5
+  ) +
+  # Group average lines
+  geom_line(
+    data = avg_wb,
+    aes(x = year, y = mean_index, color = ns_wb),
+    linewidth = 1.8
+  ) +
+  # International legal standard reference line
+  # (≈ 0.30 based on DWRAP tech guide Figure 5; adjust if needed)
+  geom_hline(yintercept = 0.30, linetype = "dashed",
+             color = "#888888", linewidth = 0.6) +
+  annotate("text", x = 1953, y = 0.315, label = "Int'l legal standard",
+           size = 2.8, color = "#888888", hjust = 0) +
+  # Event annotation lines
+  geom_vline(data = events, aes(xintercept = year),
+             linetype = "dotted", color = "#AAAAAA", linewidth = 0.5) +
+  # Event labels
+  geom_text(data = events,
+            aes(x = year, y = y_pos, label = label),
+            size = 2.5, color = "#555555", hjust = -0.08,
+            lineheight = 0.85, fontface = "italic") +
+  # Scales & theme
+  scale_color_manual(values = palette_wb, name = NULL) +
+  scale_x_continuous(breaks = seq(1950, 2020, 10), expand = c(0.01, 0)) +
+  scale_y_continuous(limits = c(0, 0.70), labels = label_number(accuracy = 0.01)) +
+  labs(
+    title    = "Asylum Policy Liberality Over Time: Global North vs. Global South",
+    subtitle = paste0(
+      "North = World Bank High-Income countries (n = ",
+      n_distinct(filter(cy_panel, north_wb)$country),
+      "); South = all others (n = ",
+      n_distinct(filter(cy_panel, !replace_na(north_wb, FALSE))$country),
+      ")\n",
+      "Light gray = individual country trends  |  Bold lines = group means  |  Index scaled 0–1"
+    ),
+    x = NULL, y = "Policy Liberality Index (0–1)",
+    caption = "Source: DWRAP (Blair, Grossman & Weinstein / World Bank, 2024). Income classifications: World Bank."
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position  = c(0.12, 0.88),
+    legend.text      = element_text(size = 10, lineheight = 0.9),
+    legend.key.width = unit(1.5, "cm"),
+    plot.title       = element_text(face = "bold", size = 13),
+    plot.subtitle    = element_text(size = 10, color = "#555555"),
+    plot.caption     = element_text(size = 8,  color = "#888888"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank()
+  )
+
+# Static version
+p_wb
+
+# Interactive version (uncomment to use instead)
+# ggplotly(p_wb, tooltip = c("x", "y", "colour")) %>%
+#   layout(legend = list(x = 0.02, y = 0.95))
+```
+
+### Version B — OECD Membership Classification
+
+```{r plot-oecd, message=FALSE, warning=FALSE, fig.width=11, fig.height=7}
+avg_oecd <- cy_panel %>%
+  filter(!is.na(ns_oecd)) %>%
+  group_by(year, ns_oecd) %>%
+  summarise(mean_index = mean(policy_index, na.rm = TRUE),
+            n = n(), .groups = "drop")
+
+palette_oecd <- c(
+  "Global North\n(OECD)"     = "#1B7837",   # green
+  "Global South\n(Non-OECD)" = "#E08214"    # amber
+)
+
+p_oecd <- ggplot() +
+  geom_line(
+    data = cy_panel %>% filter(!is.na(ns_oecd)),
+    aes(x = year, y = policy_index, group = country),
+    color = "#CCCCCC", linewidth = 0.25, alpha = 0.5
+  ) +
+  geom_line(
+    data = avg_oecd,
+    aes(x = year, y = mean_index, color = ns_oecd),
+    linewidth = 1.8
+  ) +
+  geom_hline(yintercept = 0.30, linetype = "dashed",
+             color = "#888888", linewidth = 0.6) +
+  annotate("text", x = 1953, y = 0.315, label = "Int'l legal standard",
+           size = 2.8, color = "#888888", hjust = 0) +
+  geom_vline(data = events, aes(xintercept = year),
+             linetype = "dotted", color = "#AAAAAA", linewidth = 0.5) +
+  geom_text(data = events,
+            aes(x = year, y = y_pos, label = label),
+            size = 2.5, color = "#555555", hjust = -0.08,
+            lineheight = 0.85, fontface = "italic") +
+  scale_color_manual(values = palette_oecd, name = NULL) +
+  scale_x_continuous(breaks = seq(1950, 2020, 10), expand = c(0.01, 0)) +
+  scale_y_continuous(limits = c(0, 0.70), labels = label_number(accuracy = 0.01)) +
+  labs(
+    title    = "Asylum Policy Liberality Over Time: Global North vs. Global South",
+    subtitle = paste0(
+      "North = OECD member states (n = ", length(oecd_iso3), "); ",
+      "South = non-OECD countries\n",
+      "Light gray = individual country trends  |  Bold lines = group means  |  Index scaled 0–1"
+    ),
+    x = NULL, y = "Policy Liberality Index (0–1)",
+    caption = "Source: DWRAP (Blair, Grossman & Weinstein / World Bank, 2024). OECD membership as of 2024."
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position  = c(0.12, 0.88),
+    legend.text      = element_text(size = 10, lineheight = 0.9),
+    legend.key.width = unit(1.5, "cm"),
+    plot.title       = element_text(face = "bold", size = 13),
+    plot.subtitle    = element_text(size = 10, color = "#555555"),
+    plot.caption     = element_text(size = 8,  color = "#888888"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank()
+  )
+
+p_oecd
+```
+
+### Version C — Interactive (plotly), World Bank Classification
+
+Use this version for embedding in the portfolio website — it supports hover,
+zoom, and pan.
+
+```{r plot-interactive, message=FALSE, warning=FALSE, fig.width=11, fig.height=7}
+# Build a plotly version with country-level hover detail
+build_interactive_trend <- function(ns_col, palette, title_note) {
+  cy_filtered <- cy_panel %>% filter(!is.na(.data[[ns_col]]))
+  avg         <- cy_filtered %>%
+    group_by(year, group = .data[[ns_col]]) %>%
+    summarise(mean_index = mean(policy_index, na.rm = TRUE), .groups = "drop")
+
+  fig <- plot_ly()
+
+  # Individual country traces (gray, no legend)
+  countries <- unique(cy_filtered$country)
+  for (cty in countries) {
+    d <- cy_filtered %>% filter(country == cty)
+    fig <- fig %>%
+      add_trace(
+        data = d, x = ~year, y = ~policy_index,
+        type = "scatter", mode = "lines",
+        line = list(color = "rgba(180,180,180,0.35)", width = 0.6),
+        showlegend = FALSE,
+        hoverinfo = "text",
+        text = ~paste0(country, " (", year, "): ", round(policy_index, 3))
+      )
+  }
+
+  # Group average traces
+  for (grp in unique(avg$group)) {
+    d   <- avg %>% filter(group == grp)
+    col <- palette[grp]
+    # Clean label for legend (remove \n)
+    lbl <- gsub("\n", " ", grp)
+    fig <- fig %>%
+      add_trace(
+        data = d, x = ~year, y = ~mean_index,
+        type = "scatter", mode = "lines",
+        name = lbl,
+        line = list(color = col, width = 3),
+        hovertemplate = paste0(lbl, " | %{x}: %{y:.3f}<extra></extra>")
+      )
+  }
+
+  # Event annotations
+  annotations <- lapply(seq_len(nrow(events)), function(i) {
+    list(
+      x = events$year[i], y = events$y_pos[i],
+      text = gsub("\n", "<br>", events$label[i]),
+      showarrow = TRUE, arrowhead = 0, arrowwidth = 1,
+      arrowcolor = "#AAAAAA", ax = 20, ay = -25,
+      font = list(size = 9, color = "#555555"),
+      xref = "x", yref = "y"
+    )
+  })
+
+  # Int'l legal standard line
+  shapes <- list(list(
+    type = "line",
+    x0 = min(cy_panel$year), x1 = max(cy_panel$year),
+    y0 = 0.30, y1 = 0.30,
+    line = list(color = "#AAAAAA", dash = "dot", width = 1)
+  ))
+
+  fig %>%
+    layout(
+      title = list(
+        text = paste0(
+          "<b>Asylum Policy Liberality Over Time: Global North vs. Global South</b><br>",
+          "<sup>", title_note, " | Light traces = individual countries | Hover for country detail</sup>"
+        ),
+        font = list(size = 13)
+      ),
+      xaxis = list(title = "Year", dtick = 10,
+                   showgrid = TRUE, gridcolor = "#EEEEEE"),
+      yaxis = list(title = "Policy Liberality Index (0–1)",
+                   range = c(0, 0.72),
+                   showgrid = TRUE, gridcolor = "#EEEEEE"),
+      annotations = annotations,
+      shapes      = shapes,
+      legend      = list(x = 0.02, y = 0.95, bgcolor = "rgba(255,255,255,0.8)"),
+      paper_bgcolor = "#FAFAFA",
+      plot_bgcolor  = "#FAFAFA",
+      hovermode = "closest"
+    )
+}
+
+build_interactive_trend(
+  ns_col     = "ns_wb",
+  palette    = c("Global North\n(High Income)"     = "#2166AC",
+                 "Global South\n(Non-High Income)" = "#D6604D"),
+  title_note = "North = World Bank High Income; South = all others"
+)
+```
+
+---
+
+## 5. Interpretation Notes
+
+Key things to look for in the chart:
+
+- **Convergence or divergence**: Is the Global South trend line rising faster
+  than the Global North line, narrowing the gap over time?
+- **Inflection points**: Where do the trends spike or flatten? These are
+  candidate moments for annotation — you will identify the qualitative drivers.
+- **Below the legal standard**: Note years when both group means sit *below*
+  the international legal standard dashed line. This is a key talking point.
+- **Variance within groups**: The spread of gray lines tells its own story —
+  there is enormous heterogeneity *within* the Global South.
+
+---
+
+*Next step: Merge this policy index trend with refugee hosting data to show
+whether countries that host more refugees also adopt more liberal policies —
+and whether that relationship holds differently in the North vs. South.*
