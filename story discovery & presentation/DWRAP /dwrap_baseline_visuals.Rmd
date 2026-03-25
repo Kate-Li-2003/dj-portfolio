@@ -12,27 +12,30 @@ output:
 ---
 
 ```{r setup, message=FALSE, warning=FALSE}
-# ── Install any missing packages ──────────────────────────────────────────────
-pkgs <- c(
-  "refugees",          # UNHCR official data package (CRAN)
-  "plotly",            # interactive Sankey + trend charts
-  "leaflet",           # interactive map
-  "dplyr", "tidyr",   # data wrangling
-  "countrycode",       # ISO codes → UN regions
-  "wbstats",           # World Bank income classifications
-  "rnaturalearth",     # country polygons + centroids
-  "rnaturalearthdata", # data dependency for rnaturalearth
-  "sf",                # spatial features
-  "geosphere",         # great-circle arc paths for flow lines
-  "scales",            # rescale() for line widths
-  "htmltools"          # HTML() for leaflet labels
-)
-new_pkgs <- pkgs[!pkgs %in% installed.packages()[, "Package"]]
-if (length(new_pkgs)) {
-  message("Installing: ", paste(new_pkgs, collapse = ", "))
-  install.packages(new_pkgs, repos = "https://cloud.r-project.org", quiet = TRUE)
-}
+# # ── Install any missing packages ──────────────────────────────────────────────
+# pkgs <- c(
+#   "refugees",          # UNHCR official data package (CRAN)
+#   "plotly",            # interactive Sankey + trend charts
+#   "leaflet",           # interactive map
+#   "dplyr", "tidyr",   # data wrangling
+#   "countrycode",       # ISO codes → UN regions
+#   "wbstats",           # World Bank income classifications
+#   "rnaturalearth",     # country polygons + centroids
+#   "rnaturalearthdata", # data dependency for rnaturalearth
+#   "sf",                # spatial features
+#   "geosphere",         # great-circle arc paths for flow lines
+#   "scales",            # rescale() for line widths
+#   "htmltools"          # HTML() for leaflet labels
+# )
+# new_pkgs <- pkgs[!pkgs %in% installed.packages()[, "Package"]]
+# if (length(new_pkgs)) {
+#   message("Installing: ", paste(new_pkgs, collapse = ", "))
+#   install.packages(new_pkgs, repos = "https://cloud.r-project.org", quiet = TRUE)
+# }
+```
 
+
+```{r setup, message=FALSE, warning=FALSE}
 library(refugees)
 library(plotly)
 library(leaflet)

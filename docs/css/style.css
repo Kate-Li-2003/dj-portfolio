@@ -285,12 +285,12 @@ a.card:hover .card-title {
   text-decoration: underline;
 }
 
-/* --- DWRAP story page ------------------------------------- */
+/* --- Story page: meta + body ------------------------------ */
 .story-meta {
   font-size: 0.8rem;
   color: var(--color-muted);
-  margin-top: 0.5rem;
-  line-height: 1.6;
+  margin-top: 0.6rem;
+  line-height: 1.7;
 }
 
 .story-meta a {
@@ -302,29 +302,112 @@ a.card:hover .card-title {
   max-width: 680px;
 }
 
+/* Larger opening paragraph */
+.story-intro {
+  font-size: 1.15rem;
+  line-height: 1.8;
+  color: var(--color-text);
+  margin-bottom: 1.4rem;
+  font-family: var(--font-heading);
+  font-weight: normal;
+}
+
 .story-body p {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.3rem;
   font-size: 0.975rem;
-  line-height: 1.75;
+  line-height: 1.8;
+}
+
+/* Section dividers */
+.story-section {
+  margin-top: 3.5rem;
+}
+
+.section-label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: 0.5rem;
 }
 
 .story-body h2 {
-  font-size: 1.3rem;
-  margin-top: 2.5rem;
-  margin-bottom: 0.75rem;
+  font-size: 1.45rem;
+  margin-bottom: 1rem;
   color: var(--color-text);
+  letter-spacing: -0.01em;
 }
 
-/* --- Visualization placeholders --------------------------- */
+/* Pull quote */
+.pull-quote {
+  border-left: 3px solid var(--color-accent);
+  margin: 2rem 0;
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  line-height: 1.65;
+  color: var(--color-text);
+  font-style: italic;
+}
+
+.pull-quote cite {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  font-style: normal;
+  color: var(--color-muted);
+  letter-spacing: 0.02em;
+}
+
+/* Stat callout boxes */
+.stat-row {
+  display: flex;
+  gap: 1.5rem;
+  margin: 2rem 0;
+  flex-wrap: wrap;
+}
+
+.stat-box {
+  flex: 1;
+  min-width: 140px;
+  border: 1px solid var(--color-border);
+  padding: 1.25rem 1rem;
+  background: #fff;
+  text-align: center;
+}
+
+.stat-number {
+  font-family: var(--font-heading);
+  font-size: 2.2rem;
+  color: var(--color-accent);
+  line-height: 1.1;
+  margin-bottom: 0.4rem;
+}
+
+.stat-desc {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+/* Visualization containers */
+.viz-wrap {
+  /* Breaks out of the 680px story-body constraint for full container width */
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 2rem 0 0.5rem;
+}
+
 .viz-placeholder {
   background-color: #F5F5F5;
   border: 1px solid #DDDDDD;
-  padding: 2rem;
-  margin: 1.5rem 0 1rem;
+  padding: 2.5rem 2rem;
   font-style: italic;
   color: var(--color-muted);
   font-size: 0.875rem;
-  min-height: 180px;
+  min-height: 220px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -335,7 +418,42 @@ a.card:hover .card-title {
   font-size: 1rem;
   font-style: normal;
   color: var(--color-text);
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.viz-caption {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  line-height: 1.55;
+  margin-top: 0.6rem;
+  margin-bottom: 1.5rem;
+  max-width: 680px;
+}
+
+/* Methodology note */
+.methodology {
+  margin-top: 4rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  line-height: 1.7;
+  max-width: 680px;
+}
+
+.methodology h3 {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+}
+
+.methodology a {
+  color: var(--color-muted);
+  text-decoration: underline;
 }
 
 /* --- Intro / section paragraph ---------------------------- */

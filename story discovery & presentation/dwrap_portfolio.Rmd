@@ -1,0 +1,26 @@
+---
+title: "dwrap_data"
+output: pdf_document
+date: "2026-01-12"
+---
+
+# read-in data
+
+```{r}
+library(haven)
+```
+
+
+```{r}
+dwrap <- read_dta("/Users/kateli/Downloads/dwrap_index.dta")
+dwrap_ext <- read_dta("/Users/kateli/Downloads/dwrap_update_only.dta")
+```
+
+```{r}
+
+```
+
+
+# wrangling 
+
+# viz 
