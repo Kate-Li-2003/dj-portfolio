@@ -11,31 +11,9 @@ output:
     self_contained: true
 ---
 
-```{r setup, message=FALSE, warning=FALSE}
-# # ── Install any missing packages ──────────────────────────────────────────────
-# pkgs <- c(
-#   "refugees",          # UNHCR official data package (CRAN)
-#   "plotly",            # interactive Sankey + trend charts
-#   "leaflet",           # interactive map
-#   "dplyr", "tidyr",   # data wrangling
-#   "countrycode",       # ISO codes → UN regions
-#   "wbstats",           # World Bank income classifications
-#   "rnaturalearth",     # country polygons + centroids
-#   "rnaturalearthdata", # data dependency for rnaturalearth
-#   "sf",                # spatial features
-#   "geosphere",         # great-circle arc paths for flow lines
-#   "scales",            # rescale() for line widths
-#   "htmltools"          # HTML() for leaflet labels
-# )
-# new_pkgs <- pkgs[!pkgs %in% installed.packages()[, "Package"]]
-# if (length(new_pkgs)) {
-#   message("Installing: ", paste(new_pkgs, collapse = ", "))
-#   install.packages(new_pkgs, repos = "https://cloud.r-project.org", quiet = TRUE)
-# }
-```
-
 
 ```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 library(refugees)
 library(plotly)
 library(leaflet)
@@ -239,7 +217,8 @@ build_sankey <- function(yr, title_suffix = "") {
     )
 }
 
-build_sankey(2022)
+fig_sankey <- build_sankey(2022)
+fig_sankey
 ```
 
 ### 2010
@@ -392,7 +371,7 @@ for (i in seq_len(nrow(top_flows))) {
   }
 }
 
-m %>%
+map_final <- m %>%
   addControl(
     html = HTML(paste0(
       "<div style='background:white;padding:6px 10px;border-radius:4px;",
@@ -403,6 +382,7 @@ m %>%
     )),
     position = "topright"
   )
+map_final
 ```
 
 ---
@@ -431,7 +411,7 @@ totals_by_year <- trend %>%
   group_by(year) %>%
   summarise(grand_total = sum(total), .groups = "drop")
 
-plot_ly() %>%
+fig_trend <- plot_ly() %>%
   # Area fill under the share line
   add_trace(
     data = dev_share,
@@ -487,6 +467,24 @@ plot_ly() %>%
     plot_bgcolor  = "#FAFAFA",
     legend = list(x = 0.02, y = 0.15)
   )
+fig_trend
+```
+
+---
+
+```{r export-widgets, include=FALSE}
+library(htmlwidgets)
+out_dir <- normalizePath(file.path("../../docs/visuals"), mustWork = FALSE)
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+saveWidget(fig_sankey, file = file.path(out_dir, "vis1_sankey.html"),
+           selfcontained = TRUE, title = "Visual 1 — Where Do Refugees Go?")
+
+saveWidget(map_final,  file = file.path(out_dir, "vis2_map.html"),
+           selfcontained = TRUE, title = "Visual 2 — Global Hosting Burden")
+
+saveWidget(fig_trend,  file = file.path(out_dir, "vis3_trend.html"),
+           selfcontained = TRUE, title = "Visual 3 — Share Hosted by Developing Countries")
 ```
 
 ---

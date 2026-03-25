@@ -12,6 +12,7 @@ output:
 ---
 
 ```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 # pkgs <- c("haven", "dplyr", "tidyr", "ggplot2", "plotly",
 #           "countrycode", "wbstats", "scales", "ggrepel", "forcats")
 # new_pkgs <- pkgs[!pkgs %in% installed.packages()[, "Package"]]
@@ -63,7 +64,7 @@ side by side so you can choose which framing best fits the narrative.
 
 ```{r load-data, message=FALSE, warning=FALSE}
 # Path is relative to this Rmd's location (DWRAP/ subfolder)
-dwrap_path <- "../dwrap_1951_2022.dta"
+dwrap_path <- '/Users/kateli/Desktop/DJ/DJ Portfolio /story discovery & presentation/DWRAP /dwrap_1951_2022.dta'
 
 if (!file.exists(dwrap_path)) {
   stop(paste(
@@ -458,12 +459,22 @@ build_interactive_trend <- function(ns_col, palette, title_note) {
     )
 }
 
-build_interactive_trend(
+fig_v4 <- build_interactive_trend(
   ns_col     = "ns_wb",
   palette    = c("Global North\n(High Income)"     = "#2166AC",
                  "Global South\n(Non-High Income)" = "#D6604D"),
   title_note = "North = World Bank High Income; South = all others"
 )
+fig_v4
+```
+
+```{r export-v4, include=FALSE}
+library(htmlwidgets)
+out_dir <- normalizePath(file.path("../../docs/visuals"), mustWork = FALSE)
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+saveWidget(fig_v4, file = file.path(out_dir, "vis4_policy_trends.html"),
+           selfcontained = TRUE, title = "Visual 4 — Policy Liberality: North vs. South")
 ```
 
 ---

@@ -465,6 +465,15 @@ a.card:hover .card-title {
   margin-bottom: 0.5rem;
 }
 
+/* --- Visualization iframes -------------------------------- */
+.viz-iframe {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  background: #fff;
+  /* No fixed height here — set per-instance via the height attribute */
+}
+
 /* --- Coming soon ------------------------------------------ */
 .coming-soon {
   color: var(--color-muted);
